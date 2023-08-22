@@ -2,6 +2,7 @@ import sqlite3
 
 import click
 from flask import current_app, g
+from flask_sqlalchemy import SQLAlchemy
 
 
 def get_db():
