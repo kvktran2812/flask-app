@@ -1,5 +1,5 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, render_template, redirect, request, session, request
+from flask import Flask, render_template, redirect, request, session, make_response
 from flask_session import Session
 
 
@@ -7,8 +7,10 @@ from flask_session import Session
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+app.config['SECRET_KEY'] = 'MY_TEST_SECRET_KEY'
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
+
 Session(app)
 db = SQLAlchemy(app)
 
@@ -31,24 +33,32 @@ class User(db.Model):
 def users():
     users_ = User.query.all()
     data = [u.to_json() for u in users_]
+    response = make_response(data)
+    response.status_code = 200
     return data
 
 
 @app.route("/user/<int:user_id>")
 def user_detail(user_id):
     if not session.get("name"):
-        return redirect("/login")
+        response = make_response("ERROR: user is not login")
+        response.status_code = 401
+        return response
     user = User.query.filter_by(id=user_id).first()
     if user.username == session.get("name"):
-        return user.to_json()
+        response = make_response(user.to_json())
+        response.status_code = 200
+        return response
     else:
-        return "Permission denied"
+        response = make_response("ERROR: permission denied to data")
+        response.status_code = 403
+        return response
 
 
 @app.route("/")
 def index():
     if not session.get("name"):
-        return redirect("/login")
+        return render_template('login.html')
     return render_template('index.html')
 
 
@@ -61,24 +71,43 @@ def login():
         user = User.query.filter_by(username=name).first()
         if user:
             if password == user.password:
-                session["name"] = request.form.get("name")
-                return redirect("/")
+                session["name"] = name
+                response = make_response(user.to_json())
+                response.status_code = 200
+                return response
     if request.method == 'GET' and session.get("name"):
-        return redirect("/")
+        response = make_response("User already login")
+        response.status_code = 200
+        return response
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
-    session["name"] = None
-    return redirect("/")
+    session.clear()
+    response = make_response("Logout: Clear session")
+    response.status_code = 200
+    return response
 
 
-@app.route("/current_user")
-def current_user():
-    if not session.get("name"):
-        return redirect("/login")
-    return session.get("name")
+@app.route("/register", methods=['POST', 'GET'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get("username")
+        email = request.form.get("email")
+        password = request.form.get("password")
+
+        user = User(username=username, email=email, password=password)
+        db.session.add(user)
+        db.session.commit()
+
+        response = make_response(f"SUCESS: Register successful")
+        response.status_code = 200
+        return response
+    else:
+        response = make_response("HTTP Request is not supported")
+        response.status_code = 404
+        return response
 
 
 if __name__ == '__main__':
