@@ -17,8 +17,9 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(60), unique=True, nullable=False)
+    password = db.Column(db.String(50), nullable=False)
 
-    def __repr__(self):
+    def to_json(self):
         return {
             "id": self.id,
             "username": self.username,
@@ -29,7 +30,7 @@ class User(db.Model):
 @app.route("/users")
 def users():
     users_ = User.query.all()
-    data = [u.__repr__() for u in users_]
+    data = [u.to_json() for u in users_]
     return data
 
 
@@ -38,7 +39,10 @@ def user_detail(user_id):
     if not session.get("name"):
         return redirect("/login")
     user = User.query.filter_by(id=user_id).first()
-    return user.__repr__()
+    if user.username == session.get("name"):
+        return user.to_json()
+    else:
+        return "Permission denied"
 
 
 @app.route("/")
@@ -51,8 +55,14 @@ def index():
 @app.route("/login", methods=["POST", "GET"])
 def login():
     if request.method == "POST":
-        session["name"] = request.form.get("name")
-        return redirect("/")
+        name = request.form.get("name")
+        password = request.form.get("password")
+
+        user = User.query.filter_by(username=name).first()
+        if user:
+            if password == user.password:
+                session["name"] = request.form.get("name")
+                return redirect("/")
     if request.method == 'GET' and session.get("name"):
         return redirect("/")
     return render_template("login.html")
@@ -62,6 +72,13 @@ def login():
 def logout():
     session["name"] = None
     return redirect("/")
+
+
+@app.route("/current_user")
+def current_user():
+    if not session.get("name"):
+        return redirect("/login")
+    return session.get("name")
 
 
 if __name__ == '__main__':
