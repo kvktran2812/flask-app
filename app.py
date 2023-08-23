@@ -1,44 +1,67 @@
-from flask import Flask, redirect, request, url_for, jsonify
-import sqlite3
-import json
+from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, render_template, redirect, request, session, request
+from flask_session import Session
+
+
+# create the extension
 
 app = Flask(__name__)
-server = f"src/mydatabase.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+app.config["SESSION_PERMANENT"] = False
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
+db = SQLAlchemy(app)
 
 
-def get_db_connection():
-    conn = sqlite3.connect(server)
-    return conn
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(60), unique=True, nullable=False)
+
+    def __repr__(self):
+        return {
+            "id": self.id,
+            "username": self.username,
+            "email": self.email
+        }
+
+
+@app.route("/users")
+def users():
+    users_ = User.query.all()
+    data = [u.__repr__() for u in users_]
+    return data
+
+
+@app.route("/user/<int:user_id>")
+def user_detail(user_id):
+    if not session.get("name"):
+        return redirect("/login")
+    user = User.query.filter_by(id=user_id).first()
+    return user.__repr__()
 
 
 @app.route("/")
 def index():
-    return '<p>Hello World!!!</p>'
+    if not session.get("name"):
+        return redirect("/login")
+    return render_template('index.html')
 
 
-@app.route("/address", methods=["POST", "GET"])
-def address():
-    conn = get_db_connection()
-    if request.method == "GET":
-        addresses = conn.execute("""
-            SELECT * FROM address
-        """).fetchall()
-        conn.close()
-        return addresses
+@app.route("/login", methods=["POST", "GET"])
+def login():
     if request.method == "POST":
-        street_no = request.form["street_no"]
-        address_line_1 = request.form["address_line_1"]
-        address_line_2 = request.form["address_line_2"]
-        postal_code = request.form["postal_code"]
-        city = request.form["city"]
-        province = request.form["province"]
+        session["name"] = request.form.get("name")
+        return redirect("/")
+    if request.method == 'GET' and session.get("name"):
+        return redirect("/")
+    return render_template("login.html")
 
-        conn.execute("""
-            INSERT INTO address VALUES (?, ?, ?, ?, ?, ?)
-        """, (street_no, address_line_1, address_line_2, postal_code, city, province))
-        conn.commit()
-        conn.close()
-        return request.form
+
+@app.route("/logout")
+def logout():
+    session["name"] = None
+    return redirect("/")
 
 
 if __name__ == '__main__':
