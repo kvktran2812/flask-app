@@ -1,10 +1,11 @@
-from app import app, db, User
+from flaskr.generator.create_data import *
 
-with app.app_context():
-    db.drop_all()
-    db.create_all()
 
-    db.session.add(User(username="admin", email="admin@example.com", password="helloworld1234"))
-    db.session.add(User(username="test", email="test@gmail.com", password="helloworld1234"))
-    db.session.commit()
+f_name = create_names("first_name.txt", 10)
+l_name = create_names("last_name.txt", 10)
+print(f_name)
+print(l_name)
+
+for first, last in zip(f_name, l_name):
+    print(create_username(first, last), create_email(first, last))
 
